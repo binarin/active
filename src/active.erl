@@ -83,6 +83,10 @@ path_event(C, [_E|Events]) ->
 path_event(_, []) ->
     done.
 
+
+path_modified_event(["_build", _Env ,"lib", Name|Px]) ->
+    app_modified_event(Name, Px);
+
 path_modified_event([P, Name|Px] = _Path) when P =:= "apps"; P =:= "deps" ->
     app_modified_event(Name, Px);
 
@@ -102,11 +106,12 @@ app_modified_event(_App, _P) ->
 toplevel_app() -> lists:last(filename:split(filename:absname(""))).
 
 load_ebin(EName) ->
-    Tokens = string:tokens(EName, "."),
-    case Tokens of
-        [Name, "beam"] ->
+    Ext = filename:extension(EName),
+    Name = filename:basename(EName, Ext),
+    case Ext of
+        ".beam" ->
             do_load_ebin(list_to_atom(Name));
-        [Name, "bea#"] ->
+        ".bea#" ->
             case monitor_handles_renames() of
                 false ->
                     erlang:send_after(500, ?SERVER, {load_ebin, list_to_atom(Name)}),
@@ -114,7 +119,8 @@ load_ebin(EName) ->
                 true ->
                     ignored
             end;
-        %[Name, Smth] -> ok;
+	".app" ->
+	    dont_care;
         _ ->
             error_logger:warning_msg("load_ebin: unknown ebin file: ~p", [EName]),
             ok
